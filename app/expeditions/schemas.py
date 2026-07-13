@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 from datetime import datetime
 from app.expeditions.models import ExpeditionStatus, MemberState
 from app.users.schemas import UserResponse
@@ -25,8 +25,7 @@ class ExpeditionMemberResponse(BaseModel):
     confirmed_at: datetime | None = None
     user: UserResponse
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class ExpeditionResponse(ExpeditionBase):
@@ -37,8 +36,7 @@ class ExpeditionResponse(ExpeditionBase):
     updated_at: datetime
     members: list[ExpeditionMemberResponse] = []
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class InvitationCreate(BaseModel):
@@ -48,5 +46,4 @@ class InvitationCreate(BaseModel):
 class ExpeditionStatusUpdate(BaseModel):
     status: models.ExpeditionStatus
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
