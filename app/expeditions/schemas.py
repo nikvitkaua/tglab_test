@@ -2,6 +2,7 @@ from pydantic import BaseModel, Field
 from datetime import datetime
 from app.expeditions.models import ExpeditionStatus, MemberState
 from app.users.schemas import UserResponse
+from app.expeditions import models
 
 
 class ExpeditionBase(BaseModel):
@@ -42,3 +43,10 @@ class ExpeditionResponse(ExpeditionBase):
 
 class InvitationCreate(BaseModel):
     user_id: int
+
+
+class ExpeditionStatusUpdate(BaseModel):
+    status: models.ExpeditionStatus
+
+    class Config:
+        from_attributes = True

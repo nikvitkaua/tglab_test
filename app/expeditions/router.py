@@ -90,3 +90,24 @@ def confirm_participation(
         expedition_id=expedition_id,
         user_id=current_user.id
     )
+
+
+@router.patch("/{expedition_id}/status", response_model=schemas.ExpeditionResponse)
+def change_expedition_status(
+        expedition_id: int,
+        status_data: schemas.ExpeditionStatusUpdate,
+        db: Session = Depends(get_db),
+        current_user: User = Depends(get_current_user)
+):
+    """
+    Update status (DRAFT -> READY -> ACTIVE -> FINISHED).
+    """
+    if current_user.role != UserRole.CHIEF:
+        raise HTTPException(status_code=403, detail="Тільки керівники можуть змінювати статус")
+
+    return service.update_expedition_status(
+        db=db,
+        expedition_id=expedition_id,
+        new_status=status_data.status,
+        chief_id=current_user.id
+    )

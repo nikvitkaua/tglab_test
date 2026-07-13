@@ -1,7 +1,7 @@
 from sqlalchemy.orm import Session
 from datetime import datetime, timezone
 from app.expeditions import models, schemas
-from app.expeditions.models import Expedition
+from app.expeditions.models import Expedition, ExpeditionMember
 from app.users.models import User, UserRole
 from fastapi import HTTPException, status
 
@@ -93,7 +93,7 @@ def invite_member_to_expedition(db: Session, expedition_id: int, user_id: int,
     db.refresh(db_member)
     return db_member
 
-def confirm_expedition_participation(db: Session, expedition_id: int, user_id: int) -> models.ExpeditionMember:
+def confirm_expedition_participation(db: Session, expedition_id: int, user_id: int) -> type[ExpeditionMember]:
     """
     Accept expedition participation.
     """
@@ -121,10 +121,52 @@ def confirm_expedition_participation(db: Session, expedition_id: int, user_id: i
             detail="Неможливо підтвердити участь, оскільки експедиція вже змінила статус із DRAFT"
         )
 
-    # 4. Якщо все ок — оновлюємо статус запису та записуємо точний час підтвердження
     member_record.state = models.MemberState.CONFIRMED
-    member_record.confirmed_at = datetime.now(timezone.utc)  # Використовуємо твій правильний таймзон-підхід!
+    member_record.confirmed_at = datetime.now(timezone.utc)
 
     db.commit()
     db.refresh(member_record)
     return member_record
+
+
+def update_expedition_status(db: Session, expedition_id: int, new_status: models.ExpeditionStatus,
+                             chief_id: int) -> type[Expedition]:
+    """
+    Change expedition status by chief.
+    """
+    expedition = db.query(models.Expedition).filter(models.Expedition.id == expedition_id).first()
+    if not expedition:
+        raise HTTPException(status_code=404, detail="Експедицію не знайдено")
+
+    if expedition.chief_id != chief_id:
+        raise HTTPException(status_code=403, detail="Ви не є керівником цієї експедиції")
+
+    current = expedition.status
+
+    if new_status == models.ExpeditionStatus.READY:
+        if current != models.ExpeditionStatus.DRAFT:
+            raise HTTPException(status_code=400, detail="В статус READY можна перейти тільки з DRAFT")
+
+        confirmed_count = db.query(models.ExpeditionMember).filter(
+            models.ExpeditionMember.expedition_id == expedition_id,
+            models.ExpeditionMember.state == models.MemberState.CONFIRMED
+        ).count()
+        if confirmed_count == 0:
+            raise HTTPException(status_code=400,
+                                detail="Не можна укомплектувати експедицію без підтверджених учасників")
+
+    elif new_status == models.ExpeditionStatus.ACTIVE:
+        if current != models.ExpeditionStatus.READY:
+            raise HTTPException(status_code=400, detail="Активувати експедицію можна тільки зі статусу READY")
+
+    elif new_status == models.ExpeditionStatus.FINISHED:
+        if current != models.ExpeditionStatus.ACTIVE:
+            raise HTTPException(status_code=400, detail="Завершити експедицію можна тільки якщо вона була ACTIVE")
+
+    else:
+        raise HTTPException(status_code=400, detail="Невідомий або недозволений статус")
+
+    expedition.status = new_status
+    db.commit()
+    db.refresh(expedition)
+    return expedition
