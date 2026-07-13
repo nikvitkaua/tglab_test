@@ -1,10 +1,11 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, WebSocket, WebSocketDisconnect
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
 from app.users.router import get_current_user
 from app.users.models import User, UserRole
 from app.expeditions import service, schemas
+from app.core.websocket_manager import socket_manager
 
 
 router = APIRouter(prefix="/expeditions", tags=["Expeditions"])
@@ -93,11 +94,11 @@ def confirm_participation(
 
 
 @router.patch("/{expedition_id}/status", response_model=schemas.ExpeditionResponse)
-def change_expedition_status(
-        expedition_id: int,
-        status_data: schemas.ExpeditionStatusUpdate,
-        db: Session = Depends(get_db),
-        current_user: User = Depends(get_current_user)
+async def change_expedition_status(
+    expedition_id: int,
+    status_data: schemas.ExpeditionStatusUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
 ):
     """
     Update status (DRAFT -> READY -> ACTIVE -> FINISHED).
@@ -105,9 +106,33 @@ def change_expedition_status(
     if current_user.role != UserRole.CHIEF:
         raise HTTPException(status_code=403, detail="Тільки керівники можуть змінювати статус")
 
-    return service.update_expedition_status(
+    updated_expedition = service.update_expedition_status(
         db=db,
         expedition_id=expedition_id,
         new_status=status_data.status,
         chief_id=current_user.id
     )
+
+    await socket_manager.broadcast({
+        "event": "expedition_status_changed",
+        "expedition_id": updated_expedition.id,
+        "new_status": updated_expedition.status.value,
+        "title": updated_expedition.title
+    })
+
+    return updated_expedition
+
+
+@router.websocket("/ws/updates")
+async def websocket_endpoint(websocket: WebSocket):
+    """
+    Endpoint for websocket connections.
+    """
+    await socket_manager.connect(websocket)
+
+    try:
+        while True:
+            await websocket.receive_text()
+
+    except WebSocketDisconnect:
+        socket_manager.disconnect(websocket)
