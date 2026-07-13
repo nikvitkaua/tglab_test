@@ -1,4 +1,5 @@
 from sqlalchemy.orm import Session
+from datetime import datetime, timezone
 from app.expeditions import models, schemas
 from app.expeditions.models import Expedition
 from app.users.models import User, UserRole
@@ -91,3 +92,39 @@ def invite_member_to_expedition(db: Session, expedition_id: int, user_id: int,
     db.commit()
     db.refresh(db_member)
     return db_member
+
+def confirm_expedition_participation(db: Session, expedition_id: int, user_id: int) -> models.ExpeditionMember:
+    """
+    Accept expedition participation.
+    """
+    member_record = db.query(models.ExpeditionMember).filter(
+        models.ExpeditionMember.expedition_id == expedition_id,
+        models.ExpeditionMember.user_id == user_id
+    ).first()
+
+    if not member_record:
+        raise HTTPException(
+            status_code=404,
+            detail="Запрошення на цю експедицію для вас не знайдено"
+        )
+
+    if member_record.state == models.MemberState.CONFIRMED:
+        raise HTTPException(
+            status_code=400,
+            detail="Ви вже підтвердили участь у цій експедиції"
+        )
+
+
+    if member_record.expedition.status != models.ExpeditionStatus.DRAFT:
+        raise HTTPException(
+            status_code=400,
+            detail="Неможливо підтвердити участь, оскільки експедиція вже змінила статус із DRAFT"
+        )
+
+    # 4. Якщо все ок — оновлюємо статус запису та записуємо точний час підтвердження
+    member_record.state = models.MemberState.CONFIRMED
+    member_record.confirmed_at = datetime.now(timezone.utc)  # Використовуємо твій правильний таймзон-підхід!
+
+    db.commit()
+    db.refresh(member_record)
+    return member_record

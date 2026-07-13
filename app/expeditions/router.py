@@ -67,3 +67,26 @@ def invite_user_to_expedition(
         user_id=invitation.user_id,
         chief_id=current_user.id
     )
+
+
+@router.put("/{expedition_id}/members/confirm", response_model=schemas.ExpeditionMemberResponse)
+def confirm_participation(
+        expedition_id: int,
+        db: Session = Depends(get_db),
+        current_user: User = Depends(get_current_user)
+):
+    """
+    Confirm user to participate in expedition.
+    Only for invited users with role 'member'
+    """
+    if current_user.role != UserRole.MEMBER:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Тільки користувачі з роллю 'member' можуть підтверджувати участь"
+        )
+
+    return service.confirm_expedition_participation(
+        db=db,
+        expedition_id=expedition_id,
+        user_id=current_user.id
+    )

@@ -10,7 +10,7 @@ from app.users import service, schemas, models
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
 
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="auth/token")
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/token")
 
 @router.post("/register", response_model=schemas.UserResponse, status_code=status.HTTP_201_CREATED)
 def register_user(user_in: schemas.UserCreate, db: Session = Depends(get_db)):
