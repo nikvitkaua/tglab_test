@@ -12,7 +12,6 @@ router = APIRouter(prefix="/auth", tags=["Authentication"])
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="auth/token")
 
-# POST auth/register/
 @router.post("/register", response_model=schemas.UserResponse, status_code=status.HTTP_201_CREATED)
 def register_user(user_in: schemas.UserCreate, db: Session = Depends(get_db)):
     """
@@ -30,7 +29,6 @@ def register_user(user_in: schemas.UserCreate, db: Session = Depends(get_db)):
     return service.create_user(db, user_in)
 
 
-# POST /auth/token
 @router.post("/token", response_model=schemas.Token)
 def login_for_access_token(
         form_data: OAuth2PasswordRequestForm = Depends(),
